@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Triage & Task Manager</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Email Triage">
+    <meta name="theme-color" content="#0078d4">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #0078d4;
+            margin-bottom: 10px;
+        }
+
+        .auth-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0078d4;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: #0078d4;
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            padding: 20px;
+            max-height: 700px;
+            overflow-y: auto;
+        }
+
+        .email-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+        }
+
+        .email-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .email-header {
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .email-info {
+            flex: 1;
+        }
+
+        .email-sender {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .email-subject {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .email-time {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .priority-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .priority-high {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .priority-medium {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .priority-low {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .status-badge {
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .status-unprocessed {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-task-created {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .status-no-action {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .status-archived {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .email-item.processed {
+            opacity: 0.7;
+            background: #f9f9f9;
+        }
+
+        .task-item {
+            cursor: move;
+            transition: all 0.2s ease;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .task-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .task-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        .task-item.completed {
+            opacity: 0.6;
+            background: #f9f9f9;
+        }
+
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+        }
+
+        .task-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .task-title {
+            font-weight: 600;
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.3;
+        }
+
+        .task-time {
+            color: #666;
+            font-size: 11px;
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+
+        .task-deadline {
+            color: #666;
+            font-size: 11px;
+            background: #fef3c7;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+            display: inline-block;
+            font-weight: 500;
+            border: 1px solid #fde68a;
+        }
+
+        .task-deadline.urgent {
+            background: #fee2e2;
+            color: #dc2626;
+            font-weight: 600;
+            border-color: #fca5a5;
+            animation: urgent-pulse 2s infinite;
+        }
+
+        .task-deadline.overdue {
+            background: #dc2626;
+            color: white;
+            font-weight: 600;
+            border-color: #b91c1c;
+            animation: overdue-flash 1.5s infinite;
+        }
+
+        .task-deadline.ok {
+            background: #ecfdf5;
+            color: #16a34a;
+            border-color: #bbf7d0;
+        }
+
+        @keyframes urgent-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes overdue-flash {
+            0%, 100% { background: #dc2626; }
+            50% { background: #b91c1c; }
+        }
+
+        .task-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .task-meta-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .task-priority-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .task-priority-high {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .task-priority-medium {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .task-priority-low {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .bucket {
+            background: #f8fafc;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #e5e7eb;
+        }
+
+        .bucket.drag-over {
+            background: #e0f2fe;
+            border: 2px dashed #0078d4;
+            transform: scale(1.02);
+        }
+
+        .bucket-content.drag-over {
+            background: #f0f9ff;
+            border: 2px dashed #0078d4;
+            border-radius: 8px;
+            min-height: 60px;
+            position: relative;
+        }
+
+        .bucket-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .bucket.review-drafts .bucket-header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .bucket.client-items .bucket-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .bucket.admin .bucket-header {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .bucket.business-dev .bucket-header {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .bucket.other .bucket-header {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+
+        .bucket-count {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .bucket-content {
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            min-height: 80px;
+        }
+
+        .task-buckets {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .drag-placeholder {
+            height: 60px;
+            background: #f0f9ff;
+            border: 2px dashed #0078d4;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0078d4;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        .task-item .drag-handle {
+            cursor: grab;
+            color: #999;
+            margin-right: 8px;
+            font-size: 12px;
+        }
+
+        .task-item .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .email-actions {
+            padding: 0 15px 15px;
+            display: none;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 15px;
+        }
+
+        .email-item.expanded .email-actions {
+            display: block;
+        }
+
+        .email-preview {
+            padding: 0 15px 15px;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+            display: none;
+        }
+
+        .email-item.expanded .email-preview {
+            display: block;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #0078d4;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .btn-success {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #d97706;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .task-description {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .checkbox {
+            width: 16px !important;
+            height: 16px;
+            margin-right: 10px;
+        }
+
+        .add-task-form {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            height: 50px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .sync-status {
+            color: #666;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .persistence-status {
+            color: #16a34a;
+            font-size: 11px;
+            padding: 2px 6px;
+            background: #dcfce7;
+            border-radius: 3px;
+            margin-left: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .persistence-status.show {
+            opacity: 1;
+        }
+
+        @media (max-width: 1200px) {
+            .task-buckets {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Email Triage & Task Manager</h1>
+            <p>Connect to your Outlook account to manage emails and tasks efficiently</p>
+            
+            <div class="auth-section">
+                <div class="auth-status">
+                    <div class="status-indicator" id="authStatus"></div>
+                    <span id="authStatusText">Not connected to Outlook</span>
+                </div>
+                <button class="btn btn-primary" id="authButton" onclick="authenticateOutlook()">
+                    Connect to Outlook
+                </button>
+                <div class="sync-status" id="syncStatus"></div>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="unprocessedEmails">0</div>
+                    <div>Unprocessed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="overdueTasks">0</div>
+                    <div>Overdue Tasks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalTasks">0</div>
+                    <div>Active Tasks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="completedTasks">0</div>
+                    <div>Completed Today</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Email Triage Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    📥 Email Triage
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="showOnlyUnprocessed" checked onchange="toggleEmailFilter()">
+                            Only unprocessed
+                        </label>
+                        <span id="statusMemoryIndicator" style="font-size: 11px; color: #16a34a; opacity: 0;">
+                            💾 Status preserved
+                        </span>
+                        <button class="btn btn-secondary" onclick="clearEmailHistory()" style="font-size: 11px; padding: 4px 8px;">Clear History</button>
+                        <button class="btn btn-secondary" onclick="refreshEmails()">Refresh</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div id="emailList">
+                        <div style="text-align: center; color: #666; padding: 40px;">
+                            Connect to Outlook to view your emails
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Manager Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    ✅ Task Buckets
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span id="taskPersistenceIndicator" class="persistence-status">💾 Tasks saved</span>
+                        <span style="font-size: 11px; color: #16a34a;">Auto-saves</span>
+                        <button class="btn btn-secondary" onclick="refreshTasks()">Sync Tasks</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="add-task-form">
+                        <div class="form-group">
+                            <label>Task Title</label>
+                            <input type="text" id="taskTitle" placeholder="Enter task title...">
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea id="taskDescription" placeholder="Add details..."></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Bucket</label>
+                                <select id="taskBucket">
+                                    <!-- Dynamically populated -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Time (mins)</label>
+                                <input type="number" id="taskTime" placeholder="30" min="5" max="480">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Deadline (optional)</label>
+                                <input type="datetime-local" id="taskDeadline">
+                            </div>
+                            <div class="form-group">
+                                <label>Priority</label>
+                                <select id="taskPriority">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="addTaskBtn" onclick="addTask()">Add Task</button>
+                    </div>
+
+                    <div class="task-buckets" id="taskBuckets">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include Microsoft Graph SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+
+    <script>
+        // Environment-based configuration
+        const CONFIG = {
+            production: {
+                redirectUri: 'https://fbnix.github.io/email-triage-app/',
+                clientId: '189e8579-c8e6-45bd-b37a-91d050743c9d'
+            },
+            development: {
+                redirectUri: window.location.origin,
+                clientId: '189e8579-c8e6-45bd-b37a-91d050743c9d'
+            }
+        };
+
+        const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+        const config = isProduction ? CONFIG.production : CONFIG.development;
+
+        // Microsoft Graph configuration  
+        const msalConfig = {
+            auth: {
+                clientId: config.clientId,
+                authority: 'https://login.microsoftonline.com/common',
+                redirectUri: config.redirectUri
+            },
+            cache: {
+                cacheLocation: 'localStorage',
+                storeAuthStateInCookie: false
+            }
+        };
+
+        const loginRequest = {
+            scopes: [
+                'https://graph.microsoft.com/Mail.Read',
+                'https://graph.microsoft.com/Tasks.ReadWrite',
+                'https://graph.microsoft.com/Files.ReadWrite',
+                'https://graph.microsoft.com/User.Read'
+            ]
+        };
+
+        let msalInstance;
+        let tasks = [];
+        let emails = [];
+        let isAuthenticated = false;
+        
+        // Store processed email statuses to persist across refreshes
+        let emailStatusHistory = new Map();
+        
+        // Dynamic bucket configuration
+        let buckets = [
+            { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
+            { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
+            { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
+            { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
+            { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
+            { id: 'other', name: 'Other', color: 'other', icon: '📌' }
+        ];
+
+        // Enhanced error handling
+        function handleError(error, context = 'Unknown') {
+            console.error(`Error in ${context}:`, error);
+            
+            const errorMessages = {
+                'network': 'Network connection issue. Please check your internet connection.',
+                'auth': 'Authentication failed. Please try logging in again.',
+                'storage': 'Unable to save data. Your changes may not be preserved.',
+                'graph': 'Unable to connect to Outlook. Please try again later.'
+            };
+
+            const errorType = getErrorType(error);
+            const message = errorMessages[errorType] || 'An unexpected error occurred.';
+            
+            showUserNotification(message, 'error');
+            
+            // Optional: Send to error tracking service in production
+            if (isProduction) {
+                console.log('Production error logged:', { error, context });
+            }
+        }
+
+        function getErrorType(error) {
+            const message = error.message?.toLowerCase() || '';
+            if (message.includes('network') || message.includes('fetch')) return 'network';
+            if (message.includes('authentication') || message.includes('login')) return 'auth';
+            if (message.includes('storage') || message.includes('quota')) return 'storage';
+            if (message.includes('graph') || message.includes('api')) return 'graph';
+            return 'unknown';
+        }
+
+        function showUserNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                max-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                background: ${type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#0078d4'};
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.style.transform = 'translateX(0)', 10);
+            
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => notification.parentNode?.removeChild(notification), 300);
+            }, 5000);
+        }
+
+        // Task persistence functions
+        function saveTasksToStorage() {
+            try {
+                const taskData = {
+                    tasks: tasks,
+                    buckets: buckets,
+                    timestamp: new Date().toISOString(),
+                    version: '2.0'
+                };
+                localStorage.setItem('emailTriageApp_tasks', JSON.stringify(taskData));
+                showPersistenceIndicator();
+                console.log('💾 Tasks saved to localStorage:', tasks.length, 'tasks');
+            } catch (error) {
+                handleError(error, 'Local Storage Save');
+            }
+        }
+
+        function loadTasksFromStorage() {
+            try {
+                const savedData = localStorage.getItem('emailTriageApp_tasks');
+                if (savedData) {
+                    const taskData = JSON.parse(savedData);
+                    
+                    if (taskData.tasks && Array.isArray(taskData.tasks)) {
+                        tasks = taskData.tasks.map(task => ({
+                            ...task,
+                            deadline: task.deadline ? new Date(task.deadline) : null,
+                            createdAt: task.createdAt ? new Date(task.createdAt) : new Date()
+                        }));
+                        
+                        console.log('📂 Loaded', tasks.length, 'tasks from storage');
+                    }
+                    
+                    if (taskData.buckets && Array.isArray(taskData.buckets)) {
+                        buckets = taskData.buckets;
+                        console.log('🗂️ Loaded', buckets.length, 'buckets from storage');
+                    }
+                    
+                    return true;
+                }
+            } catch (error) {
+                handleError(error, 'Local Storage Load');
+            }
+            return false;
+        }
+
+        function showPersistenceIndicator() {
+            const indicator = document.getElementById('taskPersistenceIndicator');
+            if (indicator) {
+                indicator.classList.add('show');
+                setTimeout(() => indicator.classList.remove('show'), 2000);
+            }
+        }
+
+        // OneDrive backup functionality
+        async function backupToOneDrive() {
+            if (!isAuthenticated || !msalInstance) {
+                showUserNotification('Please connect to Outlook first', 'error');
+                return false;
+            }
+            
+            try {
+                const tokenRequest = {
+                    scopes: ['https://graph.microsoft.com/Files.ReadWrite'],
+                    account: msalInstance.getAllAccounts()[0]
+                };
+                
+                const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
+                const accessToken = tokenResponse.accessToken;
+                
+                const backupData = {
+                    version: '2.0',
+                    timestamp: new Date().toISOString(),
+                    tasks: tasks,
+                    buckets: buckets,
+                    emailStatusHistory: Array.from(emailStatusHistory.entries()),
+                    metadata: {
+                        totalTasks: tasks.length,
+                        completedTasks: tasks.filter(t => t.completed).length,
+                        activeBuckets: buckets.length
+                    }
+                };
+                
+                const response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/EmailTriageBackup.json:/content', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(backupData)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Backup successful');
+                    showUserNotification('Data backed up to OneDrive', 'success');
+                    return true;
+                } else {
+                    throw new Error(`Backup failed: ${response.status}`);
+                }
+            } catch (error) {
+                handleError(error, 'OneDrive Backup');
+                return false;
+            }
+        }
+
+        async function restoreFromOneDrive() {
+            if (!isAuthenticated || !msalInstance) {
+                showUserNotification('Please connect to Outlook first', 'error');
+                return false;
+            }
+            
+            try {
+                const tokenRequest = {
+                    scopes: ['https://graph.microsoft.com/Files.ReadWrite'],
+                    account: msalInstance.getAllAccounts()[0]
+                };
+                
+                const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
+                const accessToken = tokenResponse.accessToken;
+                
+                const response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/EmailTriageBackup.json:/content', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const backupData = await response.json();
+                    
+                    const confirmRestore = confirm(`Restore data from OneDrive backup?
+            
+Backup Date: ${new Date(backupData.timestamp).toLocaleDateString()}
+Tasks: ${backupData.metadata?.totalTasks || 0}
+Buckets: ${backupData.metadata?.activeBuckets || 0}
+
+This will replace your current data.`);
+                    
+                    if (confirmRestore) {
+                        tasks = backupData.tasks.map(task => ({
+                            ...task,
+                            deadline: task.deadline ? new Date(task.deadline) : null,
+                            createdAt: task.createdAt ? new Date(task.createdAt) : new Date()
+                        }));
+                        
+                        buckets = backupData.buckets || buckets;
+                        emailStatusHistory = new Map(backupData.emailStatusHistory || []);
+                        
+                        saveTasksToStorage();
+                        updateBucketDropdown();
+                        renderBuckets();
+                        renderTasks();
+                        updateStats();
+                        
+                        showUserNotification('Data restored from OneDrive', 'success');
+                        return true;
+                    }
+                } else if (response.status === 404) {
+                    showUserNotification('No backup found in OneDrive', 'info');
+                } else {
+                    throw new Error(`Restore failed: ${response.status}`);
+                }
+            } catch (error) {
+                handleError(error, 'OneDrive Restore');
+            }
+            
+            return false;
+        }
+
+        // Initialize MSAL
+        function initializeMsal() {
+            if (typeof msal === 'undefined') {
+                console.log('MSAL library not loaded - using demo mode');
+                showSetupInstructions();
+                initializeApp();
+                return;
+            }
+
+            try {
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                console.log('MSAL initialized successfully');
+                initializeApp();
+            } catch (error) {
+                console.log('MSAL initialization failed - using demo mode', error);
+                showSetupInstructions();
+                initializeApp();
+            }
+        }
+
+        function initializeApp() {
+            const hasPersistedTasks = loadTasksFromStorage();
+            
+            if (!hasPersistedTasks) {
+                loadDemoData();
+            }
+            
+            updateBucketDropdown();
+            renderBuckets();
+            renderTasks();
+            renderEmails();
+            updateStats();
+            
+            // Setup automatic backup
+            setupAutomaticBackup();
+            setupOfflineSupport();
+        }
+
+        // Automatic backup scheduling
+        function setupAutomaticBackup() {
+            // Backup every 6 hours if authenticated
+            setInterval(() => {
+                if (isAuthenticated && tasks.length > 0) {
+                    backupToOneDrive();
+                }
+            }, 6 * 60 * 60 * 1000);
+        }
+
+        // Offline support
+        function setupOfflineSupport() {
+            window.addEventListener('online', () => {
+                showUserNotification('Back online! Syncing data...', 'success');
+                if (isAuthenticated) {
+                    loadOutlookData();
+                    backupToOneDrive();
+                }
+            });
+            
+            window.addEventListener('offline', () => {
+                showUserNotification('You are offline. Changes will sync when reconnected.', 'info');
+            });
+            
+            if (!navigator.onLine) {
+                showUserNotification('You are offline. Limited functionality available.', 'info');
+            }
+        }
+
+        function showSetupInstructions() {
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.innerHTML = `
+                <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-top: 10px; color: #155724;">
+                    <strong>✅ Ready for GitHub Pages!</strong><br>
+                    <small>Update the redirectUri in the code with your GitHub Pages URL</small>
+                </div>
+            `;
+        }
+
+        // Direct Graph API calls
+        async function callGraphAPI(endpoint, accessToken) {
+            const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Graph API call failed: ${response.status} ${response.statusText}`);
+            }
+            
+            return await response.json();
+        }
+
+        // Enhanced authentication
+        async function authenticateOutlook() {
+            if (!msalInstance) {
+                alert(`Ready to Connect! 🚀
+
+Your app is configured for GitHub Pages deployment.
+
+Next steps:
+1. Update the redirectUri in the code with your GitHub Pages URL
+2. Add the URL to your Azure AD app registration
+3. Deploy and test!`);
+                simulateAuthentication();
+                return;
+            }
+
+            try {
+                const response = await msalInstance.loginPopup(loginRequest);
+                console.log('Authentication successful', response);
+                
+                isAuthenticated = true;
+                updateAuthStatus(true);
+                await loadOutlookData();
+                showUserNotification('Successfully connected to Outlook!', 'success');
+                
+            } catch (error) {
+                console.error('Authentication failed', error);
+                handleError(error, 'Authentication');
+                updateAuthStatus(false);
+            }
+        }
+
+        function simulateAuthentication() {
+            isAuthenticated = true;
+            updateAuthStatus(true);
+            loadDemoData();
+            
+            setTimeout(() => {
+                document.getElementById('syncStatus').innerHTML = `
+                    <div style="color: #28a745; font-weight: 500;">
+                        ✅ Demo Mode - Using sample data
+                    </div>
+                `;
+            }, 1000);
+        }
+
+        function updateAuthStatus(connected) {
+            const statusIndicator = document.getElementById('authStatus');
+            const statusText = document.getElementById('authStatusText');
+            const authButton = document.getElementById('authButton');
+
+            if (connected) {
+                statusIndicator.classList.add('connected');
+                statusText.textContent = 'Connected to Outlook';
+                authButton.textContent = 'Disconnect';
+                authButton.onclick = disconnect;
+            } else {
+                statusIndicator.classList.remove('connected');
+                statusText.textContent = 'Not connected to Outlook';
+                authButton.textContent = 'Connect to Outlook';
+                authButton.onclick = authenticateOutlook;
+            }
+        }
+
+        function disconnect() {
+            if (msalInstance) {
+                msalInstance.logoutPopup();
+            }
+            isAuthenticated = false;
+            updateAuthStatus(false);
+            emails = [];
+            renderEmails();
+            updateStats();
+            document.getElementById('syncStatus').textContent = '';
+        }
+
+        function loadDemoData() {
+            emails = [
+                {
+                    id: 1,
+                    sender: "Sarah Johnson",
+                    subject: "Urgent: Client presentation needs review by 2 PM",
+                    preview: "Hi! I need your feedback on the client presentation before the meeting at 3 PM today...",
+                    time: "2 hours ago",
+                    priority: "high",
+                    status: "unprocessed",
+                    receivedDateTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    id: 2,
+                    sender: "David Chen",
+                    subject: "Draft response to opposing counsel - please review",
+                    preview: "I've prepared our response to the motion filed by opposing counsel...",
+                    time: "4 hours ago",
+                    priority: "high",
+                    status: "unprocessed",
+                    receivedDateTime: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+                }
+            ];
+
+            emails.forEach(email => {
+                const restoredStatus = getStoredEmailStatus(email);
+                email.status = restoredStatus;
+            });
+
+            if (tasks.length === 0) {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(17, 0, 0, 0);
+                
+                const nextWeek = new Date();
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                
+                tasks = [
+                    {
+                        id: 1,
+                        title: "Review patent application for XYZ Corp",
+                        description: "Complete review of patent application draft",
+                        bucket: "review-drafts",
+                        estimatedTime: 90,
+                        deadline: nextWeek,
+                        priority: "high",
+                        completed: false,
+                        createdAt: new Date()
+                    },
+                    {
+                        id: 2,
+                        title: "Draft response to motion to dismiss",
+                        description: "Prepare comprehensive response",
+                        bucket: "review-responses",
+                        estimatedTime: 120,
+                        deadline: tomorrow,
+                        priority: "high",
+                        completed: false,
+                        createdAt: new Date()
+                    }
+                ];
+                
+                saveTasksToStorage();
+            }
+        }
+
+        // Load Outlook data
+        async function loadOutlookData() {
+            if (!isAuthenticated || !msalInstance) return;
+
+            try {
+                document.getElementById('syncStatus').textContent = 'Syncing...';
+                
+                const tokenRequest = {
+                    scopes: loginRequest.scopes,
+                    account: msalInstance.getAllAccounts()[0]
+                };
+                
+                const tokenResponse = await msalInstance.acquireTokenSilent(tokenRequest);
+                const accessToken = tokenResponse.accessToken;
+
+                const emailResponse = await callGraphAPI(
+                    '/me/mailFolders/inbox/messages?$top=20&$select=subject,sender,receivedDateTime,bodyPreview,importance,id&$orderby=receivedDateTime desc',
+                    accessToken
+                );
+                
+                emails = emailResponse.value.map((email, index) => {
+                    const emailData = {
+                        id: index + 1,
+                        sender: email.sender.emailAddress.name || email.sender.emailAddress.address,
+                        subject: email.subject,
+                        preview: email.bodyPreview,
+                        time: formatTime(email.receivedDateTime),
+                        priority: email.importance === 'high' ? 'high' : 
+                                 email.importance === 'low' ? 'low' : 'medium',
+                        status: 'unprocessed',
+                        outlookId: email.id,
+                        receivedDateTime: email.receivedDateTime
+                    };
+                    
+                    const restoredStatus = getStoredEmailStatus(emailData);
+                    emailData.status = restoredStatus;
+                    
+                    return emailData;
+                });
+
+                renderEmails();
+                renderTasks();
+                updateStats();
+                document.getElementById('syncStatus').textContent = `Last synced: ${new Date().toLocaleTimeString()}`;
+                
+            } catch (error) {
+                handleError(error, 'Outlook Data Load');
+                document.getElementById('syncStatus').textContent = 'Sync failed';
+            }
+        }
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffHours < 1) return 'Just now';
+            if (diffHours < 24) return `${diffHours} hours ago`;
+            if (diffDays === 1) return 'Yesterday';
+            return `${diffDays} days ago`;
+        }
+
+        function formatDeadline(date) {
+            if (!date) return '';
+            
+            const now = new Date();
+            const diffTime = date.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) {
+                return `${Math.abs(diffDays)} days overdue`;
+            } else if (diffDays === 0) {
+                return 'Due today';
+            } else if (diffDays === 1) {
+                return 'Due tomorrow';
+            } else if (diffDays <= 7) {
+                return `Due in ${diffDays} days`;
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+        }
+
+        function getDeadlineStatus(date) {
+            if (!date) return 'none';
+            
+            const now = new Date();
+            const diffTime = date.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) return 'overdue';
+            if (diffDays <= 2) return 'urgent';
+            return 'ok';
+        }
+
+        function renderEmails() {
+            const emailList = document.getElementById('emailList');
+            const showOnlyUnprocessed = document.getElementById('showOnlyUnprocessed')?.checked ?? true;
+            
+            emailList.innerHTML = '';
+
+            if (emails.length === 0) {
+                emailList.innerHTML = `
+                    <div style="text-align: center; color: #666; padding: 40px;">
+                        ${isAuthenticated ? 'No emails found' : 'Connect to Outlook to view your emails'}
+                    </div>
+                `;
+                return;
+            }
+
+            let filteredEmails = emails;
+            if (showOnlyUnprocessed) {
+                filteredEmails = emails.filter(email => email.status === 'unprocessed');
+            }
+
+            if (filteredEmails.length === 0) {
+                emailList.innerHTML = `
+                    <div style="text-align: center; color: #666; padding: 40px;">
+                        🎉 All emails processed!<br>
+                        <small>Uncheck "Only unprocessed" to see all emails</small>
+                    </div>
+                `;
+                return;
+            }
+
+            const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+            const sortedEmails = filteredEmails.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
+
+            sortedEmails.forEach(email => {
+                const emailElement = document.createElement('div');
+                emailElement.className = `email-item ${email.status !== 'unprocessed' ? 'processed' : ''}`;
+                
+                const statusText = {
+                    'unprocessed': 'NEEDS REVIEW',
+                    'task-created': 'TASK CREATED',
+                    'no-action': 'NO ACTION',
+                    'archived': 'ARCHIVED'
+                };
+
+                emailElement.innerHTML = `
+                    <div class="email-header" onclick="toggleEmail(${email.id})">
+                        <div class="email-info">
+                            <div class="email-sender">${email.sender}</div>
+                            <div class="email-subject">${email.subject}</div>
+                            <div class="email-time">${email.time}</div>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <div class="priority-badge priority-${email.priority}">
+                                ${email.priority.toUpperCase()}
+                            </div>
+                            <div class="status-badge status-${email.status}">
+                                ${statusText[email.status]}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="email-preview">
+                        ${email.preview}
+                    </div>
+                    <div class="email-actions">
+                        <div class="action-buttons">
+                            ${email.status === 'unprocessed' ? `
+                                <button class="btn btn-primary" onclick="createTaskFromEmail(${email.id})">→ Create Task</button>
+                                <button class="btn btn-success" onclick="markEmailAsNoAction(${email.id})">✓ No Action Needed</button>
+                                <button class="btn btn-secondary" onclick="archiveEmail(${email.id})">📁 Archive</button>
+                            ` : `
+                                <button class="btn btn-secondary" onclick="markEmailAsUnprocessed(${email.id})">↺ Mark Unprocessed</button>
+                            `}
+                        </div>
+                    </div>
+                `;
+                emailList.appendChild(emailElement);
+            });
+        }
+
+        function renderTasks() {
+            buckets.forEach(bucket => {
+                const bucketContent = document.getElementById(`bucket-${bucket.id}`);
+                const bucketCount = document.getElementById(`count-${bucket.id}`);
+                
+                if (!bucketContent || !bucketCount) return;
+                
+                const bucketTasks = tasks.filter(task => task.bucket === bucket.id && !task.completed);
+                
+                bucketCount.textContent = bucketTasks.length;
+                bucketContent.innerHTML = '';
+
+                if (bucketTasks.length === 0) {
+                    bucketContent.innerHTML = '<div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>';
+                    return;
+                }
+
+                const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+                const sortedTasks = bucketTasks.sort((a, b) => {
+                    const aDeadlineStatus = getDeadlineStatus(a.deadline);
+                    const bDeadlineStatus = getDeadlineStatus(b.deadline);
+                    const deadlineOrder = { 'overdue': 4, 'urgent': 3, 'ok': 2, 'none': 1 };
+                    
+                    if (deadlineOrder[aDeadlineStatus] !== deadlineOrder[bDeadlineStatus]) {
+                        return deadlineOrder[bDeadlineStatus] - deadlineOrder[aDeadlineStatus];
+                    }
+                    
+                    const aPriority = a.priority || 'medium';
+                    const bPriority = b.priority || 'medium';
+                    return priorityOrder[bPriority] - priorityOrder[aPriority];
+                });
+
+                sortedTasks.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = `task-item ${task.completed ? 'completed' : ''}`;
+                    taskElement.draggable = true;
+                    taskElement.setAttribute('data-task-id', task.id);
+                    
+                    taskElement.addEventListener('dragstart', handleDragStart);
+                    taskElement.addEventListener('dragend', handleDragEnd);
+                    
+                    const deadlineStatus = getDeadlineStatus(task.deadline);
+                    const deadlineDisplay = task.deadline ? 
+                        `<div class="task-deadline ${deadlineStatus}">
+                            📅 ${formatDeadline(task.deadline)}
+                        </div>` : '';
+                    
+                    const priorityBadge = task.priority ? 
+                        `<div class="task-priority-badge task-priority-${task.priority}">
+                            ${task.priority}
+                        </div>` : '';
+                    
+                    taskElement.innerHTML = `
+                        <div class="task-header">
+                            <span class="drag-handle">⋮⋮</span>
+                            <input type="checkbox" class="checkbox" ${task.completed ? 'checked' : ''} 
+                                   onchange="toggleTask('${task.id}')">
+                            <div class="task-title">${task.title}</div>
+                        </div>
+                        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                        <div class="task-meta">
+                            <div class="task-meta-left">
+                                ${deadlineDisplay}
+                                ${priorityBadge}
+                            </div>
+                            <div class="task-time">${task.estimatedTime}min</div>
+                        </div>
+                        <div class="task-actions">
+                            <button class="btn btn-secondary" onclick="editTask('${task.id}')">Edit</button>
+                            <button class="btn btn-secondary" onclick="deleteTask('${task.id}')">Delete</button>
+                        </div>
+                    `;
+                    bucketContent.appendChild(taskElement);
+                });
+            });
+        }
+
+        function toggleEmail(emailId) {
+            const emailElement = document.querySelector(`[onclick*="toggleEmail(${emailId})"]`).closest('.email-item');
+            emailElement.classList.toggle('expanded');
+        }
+
+        function createTaskFromEmail(emailId) {
+            const email = emails.find(e => e.id === emailId);
+            if (email) {
+                const newTask = {
+                    id: Date.now().toString(),
+                    title: `Reply to: ${email.subject}`,
+                    description: `Follow up on email from ${email.sender}`,
+                    bucket: 'client-items',
+                    estimatedTime: 30,
+                    deadline: null,
+                    priority: 'medium',
+                    completed: false,
+                    createdAt: new Date()
+                };
+
+                tasks.push(newTask);
+                saveTasksToStorage();
+                renderTasks();
+                updateStats();
+
+                email.status = 'task-created';
+                saveEmailStatus(email);
+                renderEmails();
+
+                showUserNotification('Task created successfully!', 'success');
+            }
+        }
+
+        function addTask() {
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const bucket = document.getElementById('taskBucket').value;
+            const estimatedTime = document.getElementById('taskTime').value || 30;
+            const deadlineInput = document.getElementById('taskDeadline').value;
+            const priority = document.getElementById('taskPriority').value;
+
+            if (!title.trim()) {
+                showUserNotification('Please enter a task title', 'error');
+                return;
+            }
+
+            let deadline = null;
+            if (deadlineInput) {
+                deadline = new Date(deadlineInput);
+            }
+
+            const newTask = {
+                id: Date.now().toString(),
+                title: title.trim(),
+                description: description.trim(),
+                bucket: bucket,
+                estimatedTime: parseInt(estimatedTime),
+                deadline: deadline,
+                priority: priority,
+                completed: false,
+                createdAt: new Date()
+            };
+
+            tasks.push(newTask);
+            saveTasksToStorage();
+            
+            // Clear form
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDescription').value = '';
+            document.getElementById('taskTime').value = '';
+            document.getElementById('taskDeadline').value = '';
+            document.getElementById('taskPriority').value = 'medium';
+
+            renderTasks();
+            updateStats();
+            showUserNotification('Task added successfully!', 'success');
+        }
+
+        function toggleTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                saveTasksToStorage();
+                renderTasks();
+                updateStats();
+            }
+        }
+
+        function deleteTask(taskId) {
+            tasks = tasks.filter(t => t.id !== taskId);
+            saveTasksToStorage();
+            renderTasks();
+            updateStats();
+        }
+
+        function editTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                document.getElementById('taskTitle').value = task.title;
+                document.getElementById('taskDescription').value = task.description;
+                document.getElementById('taskBucket').value = task.bucket;
+                document.getElementById('taskTime').value = task.estimatedTime;
+                document.getElementById('taskPriority').value = task.priority || 'medium';
+                
+                if (task.deadline) {
+                    const localDeadline = new Date(task.deadline.getTime() - task.deadline.getTimezoneOffset() * 60000);
+                    document.getElementById('taskDeadline').value = localDeadline.toISOString().slice(0, 16);
+                } else {
+                    document.getElementById('taskDeadline').value = '';
+                }
+                
+                deleteTask(taskId);
+                document.getElementById('taskTitle').scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('taskTitle').focus();
+            }
+        }
+
+        function markEmailAsNoAction(emailId) {
+            const email = emails.find(e => e.id === emailId);
+            if (email) {
+                email.status = 'no-action';
+                saveEmailStatus(email);
+                renderEmails();
+                updateStats();
+            }
+        }
+
+        function archiveEmail(emailId) {
+            const email = emails.find(e => e.id === emailId);
+            if (email) {
+                email.status = 'archived';
+                saveEmailStatus(email);
+                renderEmails();
+                updateStats();
+            }
+        }
+
+        function markEmailAsUnprocessed(emailId) {
+            const email = emails.find(e => e.id === emailId);
+            if (email) {
+                email.status = 'unprocessed';
+                saveEmailStatus(email);
+                renderEmails();
+                updateStats();
+            }
+        }
+
+        function clearEmailHistory() {
+            if (confirm('Clear all email status history?')) {
+                clearEmailStatusHistory();
+                emails.forEach(email => {
+                    email.status = 'unprocessed';
+                });
+                renderEmails();
+                updateStats();
+                showUserNotification('Email history cleared', 'success');
+            }
+        }
+
+        function toggleEmailFilter() {
+            renderEmails();
+        }
+
+        function refreshEmails() {
+            if (isAuthenticated) {
+                loadOutlookData();
+            } else {
+                showUserNotification('Please connect to Outlook first', 'info');
+            }
+        }
+
+        function refreshTasks() {
+            if (isAuthenticated) {
+                loadOutlookData();
+            } else {
+                showUserNotification('Please connect to Outlook first', 'info');
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('unprocessedEmails').textContent = emails.filter(e => e.status === 'unprocessed').length;
+            document.getElementById('overdueTasks').textContent = tasks.filter(t => !t.completed && getDeadlineStatus(t.deadline) === 'overdue').length;
+            document.getElementById('totalTasks').textContent = tasks.filter(t => !t.completed).length;
+            document.getElementById('completedTasks').textContent = tasks.filter(t => t.completed).length;
+        }
+
+        // Email status persistence
+        function getEmailKey(email) {
+            const sender = typeof email.sender === 'string' ? email.sender : email.sender?.emailAddress?.name || 'unknown';
+            const subject = (email.subject || 'no-subject').trim();
+            let timeKey = 'no-time';
+            
+            if (email.receivedDateTime) {
+                const date = new Date(email.receivedDateTime);
+                timeKey = date.toISOString().split('T')[0];
+            }
+            
+            return `${sender.toLowerCase()}|${subject.toLowerCase()}|${timeKey}`;
+        }
+
+        function saveEmailStatus(email) {
+            const key = getEmailKey(email);
+            emailStatusHistory.set(key, email.status);
+            
+            const indicator = document.getElementById('statusMemoryIndicator');
+            if (indicator) {
+                indicator.style.opacity = '1';
+                setTimeout(() => indicator.style.opacity = '0', 2000);
+            }
+        }
+
+        function getStoredEmailStatus(email) {
+            const key = getEmailKey(email);
+            return emailStatusHistory.get(key) || 'unprocessed';
+        }
+
+        function clearEmailStatusHistory() {
+            emailStatusHistory.clear();
+        }
+
+        // Drag and Drop functionality
+        let draggedTaskId = null;
+
+        function handleDragStart(e) {
+            draggedTaskId = e.target.getAttribute('data-task-id');
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+            draggedTaskId = null;
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            const targetBucket = e.currentTarget;
+            
+            if (targetBucket && draggedTaskId) {
+                targetBucket.classList.add('drag-over');
+                
+                const taskElements = targetBucket.querySelectorAll('.task-item');
+                if (taskElements.length === 0) {
+                    if (!targetBucket.querySelector('.drag-placeholder')) {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'drag-placeholder';
+                        placeholder.textContent = 'Drop task here';
+                        targetBucket.appendChild(placeholder);
+                    }
+                }
+            }
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            const targetBucket = e.currentTarget;
+            const rect = targetBucket.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+            
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                targetBucket.classList.remove('drag-over');
+                const placeholder = targetBucket.querySelector('.drag-placeholder');
+                if (placeholder) {
+                    placeholder.remove();
+                }
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const targetBucketContent = e.currentTarget;
+            const targetBucketId = targetBucketContent.getAttribute('data-bucket-id');
+            
+            if (!targetBucketContent || !draggedTaskId) return false;
+            
+            const task = tasks.find(t => t.id === draggedTaskId);
+            
+            if (task && targetBucketId && task.bucket !== targetBucketId) {
+                const oldBucket = task.bucket;
+                task.bucket = targetBucketId;
+                
+                saveTasksToStorage();
+                
+                const targetBucket = buckets.find(b => b.id === targetBucketId);
+                showUserNotification(`Moved "${task.title}" to ${targetBucket?.name}`, 'success');
+                
+                renderTasks();
+                updateStats();
+            }
+            
+            targetBucketContent.classList.remove('drag-over');
+            const placeholder = targetBucketContent.querySelector('.drag-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+            
+            return false;
+        }
+
+        function updateBucketDropdown() {
+            const dropdown = document.getElementById('taskBucket');
+            dropdown.innerHTML = '';
+            
+            buckets.forEach(bucket => {
+                const option = document.createElement('option');
+                option.value = bucket.id;
+                option.textContent = bucket.name;
+                dropdown.appendChild(option);
+            });
+        }
+
+        function renderBuckets() {
+            const container = document.getElementById('taskBuckets');
+            container.innerHTML = '';
+
+            buckets.forEach(bucket => {
+                const bucketElement = document.createElement('div');
+                bucketElement.className = `bucket ${bucket.color}`;
+                bucketElement.innerHTML = `
+                    <div class="bucket-header">
+                        ${bucket.icon} ${bucket.name}
+                        <div class="bucket-count" id="count-${bucket.id}">0</div>
+                    </div>
+                    <div class="bucket-content" id="bucket-${bucket.id}" data-bucket-id="${bucket.id}"></div>
+                `;
+                container.appendChild(bucketElement);
+                
+                const bucketContent = bucketElement.querySelector('.bucket-content');
+                if (bucketContent) {
+                    bucketContent.addEventListener('dragover', handleDragOver);
+                    bucketContent.addEventListener('dragenter', handleDragEnter);
+                    bucketContent.addEventListener('dragleave', handleDragLeave);  
+                    bucketContent.addEventListener('drop', handleDrop);
+                }
+            });
+        }
+
+        // Initialize enhancements
+        function initializeEnhancements() {
+            // Add backup/restore buttons
+            const backupButton = document.createElement('button');
+            backupButton.className = 'btn btn-secondary';
+            backupButton.textContent = '💾 Backup';
+            backupButton.onclick = backupToOneDrive;
+            backupButton.style.fontSize = '11px';
+            backupButton.style.padding = '4px 8px';
+            
+            const restoreButton = document.createElement('button');
+            restoreButton.className = 'btn btn-secondary';
+            restoreButton.textContent = '📥 Restore';
+            restoreButton.onclick = restoreFromOneDrive;
+            restoreButton.style.fontSize = '11px';
+            restoreButton.style.padding = '4px 8px';
+            
+            const taskHeader = document.querySelector('.panel-header');
+            if (taskHeader) {
+                const buttonContainer = taskHeader.querySelector('div');
+                if (buttonContainer) {
+                    buttonContainer.appendChild(backupButton);
+                    buttonContainer.appendChild(restoreButton);
+                }
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMsal();
+            initializeEnhancements();
+        });
+    </script>
+</body>
+</html>
