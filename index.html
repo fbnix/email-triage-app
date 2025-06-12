@@ -1844,12 +1844,22 @@ Next steps:
             restoreButton.style.fontSize = '11px';
             restoreButton.style.padding = '4px 8px';
             
+            const resetButton = document.createElement('button');
+            resetButton.className = 'btn btn-secondary';
+            resetButton.textContent = '🗑️ Reset';
+            resetButton.onclick = clearTaskStorage;
+            resetButton.style.fontSize = '11px';
+            resetButton.style.padding = '4px 8px';
+            resetButton.style.background = '#dc2626';
+            resetButton.style.color = 'white';
+            
             const taskHeader = document.querySelector('.panel-header');
             if (taskHeader) {
                 const buttonContainer = taskHeader.querySelector('div');
                 if (buttonContainer) {
                     buttonContainer.appendChild(backupButton);
                     buttonContainer.appendChild(restoreButton);
+                    buttonContainer.appendChild(resetButton);
                 }
             }
         }
