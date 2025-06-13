@@ -21,6 +21,28 @@
             box-sizing: border-box;
         }
 
+        function testMSAL() {
+            if (typeof msal === 'undefined') {
+                alert('❌ MSAL library is not loaded.\n\nThis could be due to:\n• Network connectivity issues\n• Firewall blocking CDN\n• Ad blocker interference\n\nTry refreshing the page or checking your network connection.');
+                return;
+            }
+            
+            try {
+                const testConfig = {
+                    auth: {
+                        clientId: 'test-client-id',
+                        authority: 'https://login.microsoftonline.com/common',
+                        redirectUri: window.location.origin
+                    }
+                };
+                
+                const testInstance = new msal.PublicClientApplication(testConfig);
+                alert('✅ MSAL library is working correctly!\n\nThe issue might be with:\n• Your Azure AD app registration\n• Client ID configuration\n• Redirect URI settings');
+            } catch (error) {
+                alert(`❌ MSAL library test failed:\n\n${error.message}\n\nThis indicates a problem with the MSAL library itself.`);
+            }
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f5f5f5;
@@ -664,6 +686,9 @@
                 <button class="btn btn-primary" id="authButton" onclick="authenticateOutlook()">
                     Connect to Outlook
                 </button>
+                <button class="btn btn-secondary" onclick="showAzureSetupGuide()" style="font-size: 11px; margin-left: 10px;">
+                    🔧 Setup Help
+                </button>
                 <div class="sync-status" id="syncStatus"></div>
             </div>
 
@@ -721,6 +746,8 @@
                         <span id="taskPersistenceIndicator" class="persistence-status">💾 Tasks saved</span>
                         <span style="font-size: 11px; color: #16a34a;">Auto-saves</span>
                         <button class="btn btn-primary" onclick="showDailyRecommendations()">🤖 Daily AI Recommendations</button>
+                        <button class="btn btn-secondary" onclick="forceRenderBuckets()" style="font-size: 11px; padding: 4px 8px;">🔄 Fix Buckets</button>
+                        <button class="btn btn-secondary" onclick="debugBuckets()" style="font-size: 11px; padding: 4px 8px;">🔍 Debug</button>
                         <button class="btn btn-secondary" onclick="refreshTasks()">Sync Tasks</button>
                     </div>
                 </div>
@@ -1256,8 +1283,14 @@ This will replace your current data.`);
 
         // Initialize MSAL
         function initializeMsal() {
+            console.log('🔧 Initializing MSAL...');
+            console.log('Environment:', isProduction ? 'Production (GitHub Pages)' : 'Development');
+            console.log('Current URL:', window.location.href);
+            console.log('Redirect URI will be:', config.redirectUri);
+            
             if (typeof msal === 'undefined') {
-                console.log('MSAL library not loaded - using demo mode');
+                console.error('❌ MSAL library not loaded - check network connectivity');
+                showUserNotification('MSAL library failed to load. Check your internet connection.', 'error');
                 showSetupInstructions();
                 initializeApp();
                 return;
@@ -1265,21 +1298,52 @@ This will replace your current data.`);
 
             try {
                 msalInstance = new msal.PublicClientApplication(msalConfig);
-                console.log('MSAL initialized successfully');
+                console.log('✅ MSAL initialized successfully');
+                console.log('Configuration:', {
+                    clientId: msalConfig.auth.clientId,
+                    redirectUri: msalConfig.auth.redirectUri,
+                    authority: msalConfig.auth.authority
+                });
                 initializeApp();
             } catch (error) {
-                console.log('MSAL initialization failed - using demo mode', error);
+                console.error('❌ MSAL initialization failed:', error);
+                showUserNotification(`MSAL initialization failed: ${error.message}`, 'error');
                 showSetupInstructions();
                 initializeApp();
             }
         }
 
         function initializeApp() {
+            console.log('🚀 Initializing app...');
+            console.log('📊 Initial state:', {
+                tasksCount: tasks.length,
+                bucketsCount: buckets.length,
+                emailsCount: emails.length
+            });
+            
+            // Load persisted data
             const hasPersistedTasks = loadTasksFromStorage();
+            console.log('💾 Has persisted tasks:', hasPersistedTasks);
             
             if (!hasPersistedTasks) {
+                console.log('📝 Loading demo data...');
                 loadDemoData();
             }
+            
+            // Ensure buckets are initialized
+            if (buckets.length === 0) {
+                console.log('🗂️ Initializing default buckets...');
+                buckets = [
+                    { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
+                    { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
+                    { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
+                    { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
+                    { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
+                    { id: 'other', name: 'Other', color: 'other', icon: '📌' }
+                ];
+            }
+            
+            console.log('🗂️ Final buckets:', buckets.map(b => `${b.name} (${b.id})`));
             
             updateBucketDropdown();
             renderBuckets();
@@ -1290,6 +1354,11 @@ This will replace your current data.`);
             // Setup automatic backup
             setupAutomaticBackup();
             setupOfflineSupport();
+            
+            // Check authentication status
+            checkAuthenticationStatus();
+            
+            console.log('✅ App initialization complete');
         }
 
         // Automatic backup scheduling
@@ -1324,11 +1393,193 @@ This will replace your current data.`);
         function showSetupInstructions() {
             const syncStatus = document.getElementById('syncStatus');
             syncStatus.innerHTML = `
-                <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-top: 10px; color: #155724;">
-                    <strong>✅ Ready for GitHub Pages!</strong><br>
-                    <small>Update the redirectUri in the code with your GitHub Pages URL</small>
+                <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 4px; padding: 10px; margin-top: 10px; color: #92400e;">
+                    <strong>⚠️ Authentication Setup Required</strong><br>
+                    <small>Check browser console for detailed debug information</small>
+                    <br><br>
+                    <button class="btn btn-secondary" onclick="debugAuthentication()" style="font-size: 11px;">🔍 Debug Authentication</button>
+                    <button class="btn btn-secondary" onclick="testMSAL()" style="font-size: 11px;">🧪 Test MSAL</button>
                 </div>
             `;
+        }
+
+        function debugAuthentication() {
+            const debugInfo = {
+                currentUrl: window.location.href,
+                protocol: window.location.protocol,
+                hostname: window.location.hostname,
+                isProduction: isProduction,
+                configuredRedirectUri: config.redirectUri,
+                msalAvailable: typeof msal !== 'undefined',
+                msalInstanceCreated: !!msalInstance,
+                clientId: msalConfig.auth.clientId
+            };
+            
+            console.log('🔍 Authentication Debug Info:', debugInfo);
+            
+            let message = `🔍 Authentication Debug Info:
+
+Current URL: ${debugInfo.currentUrl}
+Protocol: ${debugInfo.protocol}
+Is Production: ${debugInfo.isProduction}
+Configured Redirect URI: ${debugInfo.configuredRedirectUri}
+MSAL Library Available: ${debugInfo.msalAvailable}
+MSAL Instance Created: ${debugInfo.msalInstanceCreated}
+Client ID: ${debugInfo.clientId}
+
+`;
+            
+            if (debugInfo.protocol === 'file:') {
+                message += `❌ ISSUE: Running from file:// protocol
+✅ SOLUTION: Use a web server or GitHub Pages
+
+`;
+            }
+            
+            if (!debugInfo.msalAvailable) {
+                message += `❌ ISSUE: MSAL library not loaded
+✅ SOLUTION: Check internet connection, try refreshing
+
+`;
+            }
+            
+            if (debugInfo.configuredRedirectUri !== window.location.origin + window.location.pathname) {
+                message += `❌ ISSUE: Redirect URI mismatch
+✅ SOLUTION: Update Azure AD to include: ${window.location.origin + window.location.pathname}
+
+`;
+            }
+            
+            message += `
+🔧 Next Steps:
+1. Copy this info to help troubleshoot
+2. Check browser console for more details
+3. Verify Azure AD app registration settings`;
+            
+            alert(message);
+        }
+
+        // Force bucket re-rendering
+        function forceRenderBuckets() {
+            console.log('🔄 Force rendering buckets...');
+            
+            // Ensure buckets array is populated
+            if (buckets.length === 0) {
+                buckets = [
+                    { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
+                    { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
+                    { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
+                    { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
+                    { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
+                    { id: 'other', name: 'Other', color: 'other', icon: '📌' }
+                ];
+                console.log('🗂️ Restored default buckets');
+            }
+            
+            updateBucketDropdown();
+            renderBuckets();
+            renderTasks();
+            updateStats();
+            
+            showUserNotification('Buckets re-rendered!', 'success');
+        }
+            console.log('🔍 Bucket Debug Information:');
+            console.log('Buckets array:', buckets);
+            console.log('Buckets count:', buckets.length);
+            
+            const container = document.getElementById('taskBuckets');
+            console.log('Task buckets container:', container);
+            console.log('Container HTML:', container?.innerHTML);
+            
+            if (container) {
+                console.log('Container children count:', container.children.length);
+                Array.from(container.children).forEach((child, index) => {
+                    console.log(`Child ${index}:`, child.className, child.innerHTML.substring(0, 100));
+                });
+            }
+            
+            // Test bucket rendering manually
+            if (buckets.length > 0) {
+                console.log('🧪 Testing bucket rendering...');
+                renderBuckets();
+                
+                setTimeout(() => {
+                    const updatedContainer = document.getElementById('taskBuckets');
+                    console.log('After render - container children:', updatedContainer?.children.length);
+                }, 100);
+            }
+            
+            alert(`🔍 Bucket Debug Info:
+
+Buckets configured: ${buckets.length}
+Task container found: ${!!container}
+Container children: ${container?.children.length || 0}
+
+Check browser console for detailed information.`);
+        }
+            const currentUrl = window.location.href;
+            const baseUrl = window.location.origin + window.location.pathname;
+            
+            alert(`🔧 Azure AD Setup Guide
+
+Your app URL: ${currentUrl}
+
+📋 Steps to configure Azure AD:
+
+1. Go to portal.azure.com
+2. Navigate to "Azure Active Directory"
+3. Click "App registrations"
+4. Find your app OR create new registration:
+   • Name: "Email Triage App"
+   • Account types: "Personal Microsoft accounts only"
+   • Redirect URI: Web → ${baseUrl}
+
+5. In your app registration:
+   • Click "Authentication"
+   • Add redirect URI: ${baseUrl}
+   • Enable "Access tokens" and "ID tokens"
+   
+6. Click "API permissions"
+   • Add these Microsoft Graph permissions:
+   • Mail.Read (delegated)
+   • Mail.ReadWrite (delegated)  
+   • Tasks.ReadWrite (delegated)
+   • Files.ReadWrite (delegated)
+   • User.Read (delegated)
+
+7. Copy your "Application (client) ID"
+8. Update the clientId in your app code
+
+⚠️ Common Issues:
+• Redirect URI must match exactly (with/without trailing slash)
+• App must be accessed via HTTPS or localhost
+• Popups must be enabled in browser
+
+Current Configuration:
+• Client ID: ${msalConfig.auth.clientId}
+• Redirect URI: ${msalConfig.auth.redirectUri}
+
+Need help? Check the browser console for detailed error messages.`);
+        }
+            if (typeof msal === 'undefined') {
+                alert('❌ MSAL library is not loaded.\n\nThis could be due to:\n• Network connectivity issues\n• Firewall blocking CDN\n• Ad blocker interference\n\nTry refreshing the page or checking your network connection.');
+                return;
+            }
+            
+            try {
+                const testConfig = {
+                    auth: {
+                        clientId: 'test-client-id',
+                        authority: 'https://login.microsoftonline.com/common',
+                        redirectUri: window.location.origin
+                    }
+                };
+                
+                const testInstance = new msal.PublicClientApplication(testConfig);
+                alert('✅ MSAL library is working correctly!\n\nThe issue might be with:\n• Your Azure AD app registration\n• Client ID configuration\n• Redirect URI settings');
+            } catch (error) {
+                alert(`❌ MSAL library test failed:\n\n${error.message}\n\nThis indicates a problem with the MSAL library itself.`);
+            }
         }
 
         // Direct Graph API calls
@@ -1347,24 +1598,52 @@ This will replace your current data.`);
             return await response.json();
         }
 
-        // Enhanced authentication
+        // Enhanced authentication with detailed debugging
         async function authenticateOutlook() {
+            console.log('🔐 Authentication attempt started...');
+            
             if (!msalInstance) {
-                alert(`Ready to Connect! 🚀
+                console.error('❌ MSAL instance not available');
+                
+                // Check if we're in a proper web environment
+                if (window.location.protocol === 'file:') {
+                    alert(`❌ File Protocol Detected
 
-Your app is configured for GitHub Pages deployment.
+You're running the app from a file:// URL, which won't work with Outlook authentication.
 
-Next steps:
-1. Update the redirectUri in the code with your GitHub Pages URL
-2. Add the URL to your Azure AD app registration
-3. Deploy and test!`);
+✅ Solutions:
+1. Upload to GitHub Pages (recommended)
+2. Use a local web server:
+   • Python: python -m http.server 8000
+   • Node.js: npx serve .
+   • PHP: php -S localhost:8000
+
+Then access via http://localhost:8000`);
+                } else {
+                    alert(`❌ Authentication Setup Issue
+
+The Microsoft authentication library (MSAL) is not available.
+
+🔧 Possible fixes:
+1. Check your internet connection
+2. Try refreshing the page
+3. Check browser console for errors
+
+Current environment: ${window.location.href}`);
+                }
+                
                 simulateAuthentication();
                 return;
             }
 
             try {
+                console.log('🚀 Starting popup authentication...');
+                console.log('Login request scopes:', loginRequest.scopes);
+                
+                showUserNotification('Opening Microsoft login popup...', 'info');
+                
                 const response = await msalInstance.loginPopup(loginRequest);
-                console.log('Authentication successful', response);
+                console.log('✅ Authentication successful:', response);
                 
                 isAuthenticated = true;
                 updateAuthStatus(true);
@@ -1372,7 +1651,48 @@ Next steps:
                 showUserNotification('Successfully connected to Outlook!', 'success');
                 
             } catch (error) {
-                console.error('Authentication failed', error);
+                console.error('❌ Authentication failed:', error);
+                
+                // Provide specific error messages
+                let errorMessage = 'Authentication failed. ';
+                let actionMessage = '';
+                
+                if (error.errorCode === 'popup_window_error') {
+                    errorMessage += 'Popup was blocked.';
+                    actionMessage = 'Please allow popups for this site and try again.';
+                } else if (error.errorCode === 'user_cancelled') {
+                    errorMessage += 'Login was cancelled.';
+                    actionMessage = 'Please try again and complete the login process.';
+                } else if (error.message?.includes('redirect_uri')) {
+                    errorMessage += 'Redirect URI mismatch.';
+                    actionMessage = `Please add "${config.redirectUri}" to your Azure AD app registration.`;
+                } else if (error.message?.includes('CORS')) {
+                    errorMessage += 'CORS error.';
+                    actionMessage = 'Please check your Azure AD CORS settings.';
+                } else {
+                    errorMessage += error.message || 'Unknown error occurred.';
+                }
+                
+                console.log('🔧 Troubleshooting info:');
+                console.log('- Client ID:', msalConfig.auth.clientId);
+                console.log('- Redirect URI:', msalConfig.auth.redirectUri);
+                console.log('- Current URL:', window.location.href);
+                console.log('- Error details:', error);
+                
+                alert(`${errorMessage}
+
+${actionMessage}
+
+🔧 Debug info (check console for details):
+• Client ID: ${msalConfig.auth.clientId}
+• Redirect URI: ${msalConfig.auth.redirectUri}
+• Current URL: ${window.location.href}
+
+💡 Common fixes:
+1. Add your exact URL to Azure AD redirect URIs
+2. Enable popups for this site
+3. Clear browser cache and try again`);
+                
                 handleError(error, 'Authentication');
                 updateAuthStatus(false);
             }
@@ -2063,7 +2383,46 @@ Next steps:
             });
         }
 
-        // Daily Recommendations AI Functions
+        function checkAuthenticationStatus() {
+            console.log('🔍 Checking authentication status...');
+            
+            // Check for immediate issues
+            const issues = [];
+            
+            if (window.location.protocol === 'file:') {
+                issues.push('❌ File protocol detected - authentication will not work');
+            }
+            
+            if (typeof msal === 'undefined') {
+                issues.push('❌ MSAL library failed to load');
+            }
+            
+            if (msalConfig.auth.clientId === '189e8579-c8e6-45bd-b37a-91d050743c9d') {
+                issues.push('⚠️ Using default client ID - you may need to register your own Azure AD app');
+            }
+            
+            if (config.redirectUri !== window.location.origin + window.location.pathname) {
+                issues.push(`⚠️ Redirect URI mismatch: configured=${config.redirectUri}, actual=${window.location.origin + window.location.pathname}`);
+            }
+            
+            if (issues.length > 0) {
+                console.warn('🚨 Authentication issues detected:');
+                issues.forEach(issue => console.warn(issue));
+                
+                // Show a helpful status message
+                const syncStatus = document.getElementById('syncStatus');
+                if (syncStatus) {
+                    syncStatus.innerHTML = `
+                        <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 4px; padding: 8px; margin-top: 10px; color: #92400e; font-size: 12px;">
+                            <strong>⚠️ Authentication may not work</strong><br>
+                            Click "🔧 Setup Help" for configuration assistance
+                        </div>
+                    `;
+                }
+            } else {
+                console.log('✅ Authentication configuration looks good');
+            }
+        }
         function showDailyRecommendations() {
             document.getElementById('recommendationsModal').style.display = 'block';
             document.getElementById('recommendationsResults').style.display = 'none';
@@ -2402,8 +2761,31 @@ Generated by AI Email Triage & Task Manager
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('📄 DOM Content Loaded - starting initialization...');
+            
+            // Double-check that the task buckets container exists
+            const taskBucketsContainer = document.getElementById('taskBuckets');
+            if (!taskBucketsContainer) {
+                console.error('❌ Critical: taskBuckets container not found in DOM!');
+                setTimeout(() => {
+                    alert('❌ Critical Error: Task buckets container not found!\n\nThis usually means there\'s a JavaScript error preventing the page from loading correctly.\n\nPlease:\n1. Check browser console for errors\n2. Try refreshing the page\n3. Clear browser cache');
+                }, 1000);
+                return;
+            }
+            
+            console.log('✅ Task buckets container found, proceeding with initialization');
+            
             initializeMsal();
             initializeEnhancements();
+            
+            // Add a backup render attempt
+            setTimeout(() => {
+                const container = document.getElementById('taskBuckets');
+                if (container && container.children.length === 0) {
+                    console.warn('⚠️ Buckets not rendered after initialization, attempting force render...');
+                    forceRenderBuckets();
+                }
+            }, 2000);
         });
     </script>
 </body>
