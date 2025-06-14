@@ -791,10 +791,65 @@
                     </div>
 
                     <div class="task-buckets" id="taskBuckets">
-                        <!-- Buckets will be dynamically populated -->
-                        <div id="bucketsPlaceholder" style="text-align: center; color: #666; padding: 40px;">
-                            <div style="margin-bottom: 15px;">Loading task buckets...</div>
-                            <button class="btn btn-primary" onclick="forceRenderBuckets()">🔄 Load Buckets Now</button>
+                        <!-- Default buckets rendered in HTML to ensure they always show -->
+                        <div class="bucket review-drafts">
+                            <div class="bucket-header">
+                                📝 Review Draft Applications
+                                <div class="bucket-count" id="count-review-drafts">0</div>
+                            </div>
+                            <div class="bucket-content" id="bucket-review-drafts" data-bucket-id="review-drafts">
+                                <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                            </div>
+                        </div>
+
+                        <div class="bucket review-responses">
+                            <div class="bucket-header">
+                                📋 Review Draft Responses
+                                <div class="bucket-count" id="count-review-responses">0</div>
+                            </div>
+                            <div class="bucket-content" id="bucket-review-responses" data-bucket-id="review-responses">
+                                <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                            </div>
+                        </div>
+
+                        <div class="bucket client-items">
+                            <div class="bucket-header">
+                                🤝 Items to Discuss with Client
+                                <div class="bucket-count" id="count-client-items">0</div>
+                            </div>
+                            <div class="bucket-content" id="bucket-client-items" data-bucket-id="client-items">
+                                <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                            </div>
+                        </div>
+
+                        <div class="bucket admin">
+                            <div class="bucket-header">
+                                📁 Admin
+                                <div class="bucket-count" id="count-admin">0</div>
+                            </div>
+                            <div class="bucket-content" id="bucket-admin" data-bucket-id="admin">
+                                <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                            </div>
+                        </div>
+
+                        <div class="bucket business-dev">
+                            <div class="bucket-header">
+                                🚀 Business Development
+                                <div class="bucket-count" id="count-business-dev">0</div>
+                            </div>
+                            <div class="bucket-content" id="bucket-business-dev" data-bucket-id="business-dev">
+                                <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                            </div>
+                        </div>
+
+                        <div class="bucket other">
+                            <div class="bucket-header">
+                                📌 Other
+                                <div class="bucket-count" id="count-other">0</div>
+                            </div>
+                            <div class="bucket-content" id="bucket-other" data-bucket-id="other">
+                                <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1463,68 +1518,16 @@ Client ID: ${debugInfo.clientId}
             alert(message);
         }
 
-        // Force bucket re-rendering - simplified and more reliable
+        // Force bucket re-rendering - now just resets functionality since buckets are in HTML
         function forceRenderBuckets() {
-            console.log('🔄 FORCE RENDER BUCKETS - START');
+            console.log('🔄 Refreshing bucket functionality...');
             
-            // Ensure buckets array is populated with defaults
-            buckets = [
-                { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
-                { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
-                { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
-                { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
-                { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
-                { id: 'other', name: 'Other', color: 'other', icon: '📌' }
-            ];
-            
-            console.log('🗂️ Reset buckets to defaults, count:', buckets.length);
-            
-            // Get container
-            const container = document.getElementById('taskBuckets');
-            if (!container) {
-                console.error('❌ Cannot find taskBuckets container!');
-                alert('Error: Cannot find task buckets container element. The page may not have loaded correctly.');
-                return;
-            }
-            
-            // Clear and rebuild
-            container.innerHTML = '';
-            
-            // Create buckets with inline HTML approach for reliability
-            const bucketsHTML = buckets.map(bucket => `
-                <div class="bucket ${bucket.color}">
-                    <div class="bucket-header">
-                        ${bucket.icon} ${bucket.name}
-                        <div class="bucket-count" id="count-${bucket.id}">0</div>
-                    </div>
-                    <div class="bucket-content" id="bucket-${bucket.id}" data-bucket-id="${bucket.id}">
-                        <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
-                    </div>
-                </div>
-            `).join('');
-            
-            container.innerHTML = bucketsHTML;
-            
-            // Add event listeners after HTML is set
-            buckets.forEach(bucket => {
-                const bucketContent = document.getElementById(`bucket-${bucket.id}`);
-                if (bucketContent) {
-                    bucketContent.addEventListener('dragover', handleDragOver);
-                    bucketContent.addEventListener('dragenter', handleDragEnter);
-                    bucketContent.addEventListener('dragleave', handleDragLeave);
-                    bucketContent.addEventListener('drop', handleDrop);
-                    console.log(`✅ Added listeners to bucket: ${bucket.name}`);
-                }
-            });
-            
-            updateBucketDropdown();
+            // Buckets are in HTML, just need to refresh the JavaScript functionality
+            renderBuckets();
             renderTasks();
             updateStats();
             
-            console.log('🔄 FORCE RENDER BUCKETS - COMPLETE');
-            console.log('Final container HTML length:', container.innerHTML.length);
-            
-            showUserNotification('Task buckets restored!', 'success');
+            showUserNotification('Task buckets refreshed!', 'success');
         }
             console.log('🔍 Bucket Debug Information:');
             console.log('Buckets array:', buckets);
@@ -2806,44 +2809,35 @@ Generated by AI Email Triage & Task Manager
         document.addEventListener('DOMContentLoaded', () => {
             console.log('📄 DOM Content Loaded - starting initialization...');
             
-            // IMMEDIATELY ensure buckets are available and render them
-            if (buckets.length === 0) {
-                console.log('🗂️ Initializing buckets immediately...');
-                buckets = [
-                    { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
-                    { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
-                    { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
-                    { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
-                    { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
-                    { id: 'other', name: 'Other', color: 'other', icon: '📌' }
-                ];
-            }
+            // Ensure buckets array matches the HTML buckets
+            buckets = [
+                { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
+                { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
+                { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
+                { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
+                { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
+                { id: 'other', name: 'Other', color: 'other', icon: '📌' }
+            ];
             
-            // Force immediate bucket rendering
-            console.log('🔄 Force rendering buckets immediately...');
-            updateBucketDropdown();
+            console.log('✅ Buckets array initialized with', buckets.length, 'buckets');
+            
+            // Set up bucket functionality (they're already in HTML)
             renderBuckets();
             
             // Load any saved data
             loadTasksFromStorage();
             
-            // Render tasks and emails
+            // Set up other components
+            updateBucketDropdown();
             renderTasks();
             renderEmails();
             updateStats();
             
-            // Then do the other initialization
+            // Initialize authentication and other features
             initializeMsal();
             initializeEnhancements();
             
-            // Safety check - render buckets again if they're still missing
-            setTimeout(() => {
-                const container = document.getElementById('taskBuckets');
-                if (container && container.children.length === 0) {
-                    console.warn('⚠️ Buckets still not rendered after 1 second, forcing render...');
-                    renderBuckets();
-                }
-            }, 1000);
+            console.log('✅ App initialization complete');
         });
     </script>
 </body>
