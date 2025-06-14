@@ -791,7 +791,11 @@
                     </div>
 
                     <div class="task-buckets" id="taskBuckets">
-                        <!-- Dynamically populated -->
+                        <!-- Buckets will be dynamically populated -->
+                        <div id="bucketsPlaceholder" style="text-align: center; color: #666; padding: 40px;">
+                            <div style="margin-bottom: 15px;">Loading task buckets...</div>
+                            <button class="btn btn-primary" onclick="forceRenderBuckets()">🔄 Load Buckets Now</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1459,29 +1463,68 @@ Client ID: ${debugInfo.clientId}
             alert(message);
         }
 
-        // Force bucket re-rendering
+        // Force bucket re-rendering - simplified and more reliable
         function forceRenderBuckets() {
-            console.log('🔄 Force rendering buckets...');
+            console.log('🔄 FORCE RENDER BUCKETS - START');
             
-            // Ensure buckets array is populated
-            if (buckets.length === 0) {
-                buckets = [
-                    { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
-                    { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
-                    { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
-                    { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
-                    { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
-                    { id: 'other', name: 'Other', color: 'other', icon: '📌' }
-                ];
-                console.log('🗂️ Restored default buckets');
+            // Ensure buckets array is populated with defaults
+            buckets = [
+                { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
+                { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
+                { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
+                { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
+                { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
+                { id: 'other', name: 'Other', color: 'other', icon: '📌' }
+            ];
+            
+            console.log('🗂️ Reset buckets to defaults, count:', buckets.length);
+            
+            // Get container
+            const container = document.getElementById('taskBuckets');
+            if (!container) {
+                console.error('❌ Cannot find taskBuckets container!');
+                alert('Error: Cannot find task buckets container element. The page may not have loaded correctly.');
+                return;
             }
             
+            // Clear and rebuild
+            container.innerHTML = '';
+            
+            // Create buckets with inline HTML approach for reliability
+            const bucketsHTML = buckets.map(bucket => `
+                <div class="bucket ${bucket.color}">
+                    <div class="bucket-header">
+                        ${bucket.icon} ${bucket.name}
+                        <div class="bucket-count" id="count-${bucket.id}">0</div>
+                    </div>
+                    <div class="bucket-content" id="bucket-${bucket.id}" data-bucket-id="${bucket.id}">
+                        <div style="color: #999; font-size: 12px; text-align: center; padding: 20px;">No tasks in this bucket</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = bucketsHTML;
+            
+            // Add event listeners after HTML is set
+            buckets.forEach(bucket => {
+                const bucketContent = document.getElementById(`bucket-${bucket.id}`);
+                if (bucketContent) {
+                    bucketContent.addEventListener('dragover', handleDragOver);
+                    bucketContent.addEventListener('dragenter', handleDragEnter);
+                    bucketContent.addEventListener('dragleave', handleDragLeave);
+                    bucketContent.addEventListener('drop', handleDrop);
+                    console.log(`✅ Added listeners to bucket: ${bucket.name}`);
+                }
+            });
+            
             updateBucketDropdown();
-            renderBuckets();
             renderTasks();
             updateStats();
             
-            showUserNotification('Buckets re-rendered!', 'success');
+            console.log('🔄 FORCE RENDER BUCKETS - COMPLETE');
+            console.log('Final container HTML length:', container.innerHTML.length);
+            
+            showUserNotification('Task buckets restored!', 'success');
         }
             console.log('🔍 Bucket Debug Information:');
             console.log('Buckets array:', buckets);
@@ -2763,29 +2806,44 @@ Generated by AI Email Triage & Task Manager
         document.addEventListener('DOMContentLoaded', () => {
             console.log('📄 DOM Content Loaded - starting initialization...');
             
-            // Double-check that the task buckets container exists
-            const taskBucketsContainer = document.getElementById('taskBuckets');
-            if (!taskBucketsContainer) {
-                console.error('❌ Critical: taskBuckets container not found in DOM!');
-                setTimeout(() => {
-                    alert('❌ Critical Error: Task buckets container not found!\n\nThis usually means there\'s a JavaScript error preventing the page from loading correctly.\n\nPlease:\n1. Check browser console for errors\n2. Try refreshing the page\n3. Clear browser cache');
-                }, 1000);
-                return;
+            // IMMEDIATELY ensure buckets are available and render them
+            if (buckets.length === 0) {
+                console.log('🗂️ Initializing buckets immediately...');
+                buckets = [
+                    { id: 'review-drafts', name: 'Review Draft Applications', color: 'review-drafts', icon: '📝' },
+                    { id: 'review-responses', name: 'Review Draft Responses', color: 'review-responses', icon: '📋' },
+                    { id: 'client-items', name: 'Items to Discuss with Client', color: 'client-items', icon: '🤝' },
+                    { id: 'admin', name: 'Admin', color: 'admin', icon: '📁' },
+                    { id: 'business-dev', name: 'Business Development', color: 'business-dev', icon: '🚀' },
+                    { id: 'other', name: 'Other', color: 'other', icon: '📌' }
+                ];
             }
             
-            console.log('✅ Task buckets container found, proceeding with initialization');
+            // Force immediate bucket rendering
+            console.log('🔄 Force rendering buckets immediately...');
+            updateBucketDropdown();
+            renderBuckets();
             
+            // Load any saved data
+            loadTasksFromStorage();
+            
+            // Render tasks and emails
+            renderTasks();
+            renderEmails();
+            updateStats();
+            
+            // Then do the other initialization
             initializeMsal();
             initializeEnhancements();
             
-            // Add a backup render attempt
+            // Safety check - render buckets again if they're still missing
             setTimeout(() => {
                 const container = document.getElementById('taskBuckets');
                 if (container && container.children.length === 0) {
-                    console.warn('⚠️ Buckets not rendered after initialization, attempting force render...');
-                    forceRenderBuckets();
+                    console.warn('⚠️ Buckets still not rendered after 1 second, forcing render...');
+                    renderBuckets();
                 }
-            }, 2000);
+            }, 1000);
         });
     </script>
 </body>
