@@ -21,6 +21,47 @@
             box-sizing: border-box;
         }
 
+        function checkAuthenticationStatus() {
+            console.log('🔍 Checking authentication status...');
+            
+            // Check for immediate issues
+            const issues = [];
+            
+            if (window.location.protocol === 'file:') {
+                issues.push('❌ File protocol detected - authentication will not work');
+            }
+            
+            if (typeof msal === 'undefined') {
+                issues.push('❌ MSAL library failed to load');
+            }
+            
+            if (msalConfig.auth.clientId === '189e8579-c8e6-45bd-b37a-91d050743c9d') {
+                issues.push('⚠️ Using default client ID - you may need to register your own Azure AD app');
+            }
+            
+            if (config.redirectUri !== window.location.origin + window.location.pathname) {
+                issues.push(`⚠️ Redirect URI mismatch: configured=${config.redirectUri}, actual=${window.location.origin + window.location.pathname}`);
+            }
+            
+            if (issues.length > 0) {
+                console.warn('🚨 Authentication issues detected:');
+                issues.forEach(issue => console.warn(issue));
+                
+                // Show a helpful status message
+                const syncStatus = document.getElementById('syncStatus');
+                if (syncStatus) {
+                    syncStatus.innerHTML = `
+                        <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 4px; padding: 8px; margin-top: 10px; color: #92400e; font-size: 12px;">
+                            <strong>⚠️ Authentication may not work</strong><br>
+                            Click "🧪 Test Connection" to diagnose issues
+                        </div>
+                    `;
+                }
+            } else {
+                console.log('✅ Authentication configuration looks good');
+            }
+        }
+
         function testMSAL() {
             if (typeof msal === 'undefined') {
                 alert('❌ MSAL library is not loaded.\n\nThis could be due to:\n• Network connectivity issues\n• Firewall blocking CDN\n• Ad blocker interference\n\nTry refreshing the page or checking your network connection.');
@@ -683,11 +724,14 @@
                     <div class="status-indicator" id="authStatus"></div>
                     <span id="authStatusText">Not connected to Outlook</span>
                 </div>
-                <button class="btn btn-primary" id="authButton" onclick="authenticateOutlook()">
+                <button class="btn btn-primary" id="authButton" onclick="testButtonClick()">
                     Connect to Outlook
                 </button>
                 <button class="btn btn-secondary" onclick="showAzureSetupGuide()" style="font-size: 11px; margin-left: 10px;">
                     🔧 Setup Help
+                </button>
+                <button class="btn btn-secondary" onclick="runConnectionTest()" style="font-size: 11px; margin-left: 10px;">
+                    🧪 Test Connection
                 </button>
                 <div class="sync-status" id="syncStatus"></div>
             </div>
@@ -1646,48 +1690,74 @@ Need help? Check the browser console for detailed error messages.`);
 
         // Enhanced authentication with detailed debugging
         async function authenticateOutlook() {
-            console.log('🔐 Authentication attempt started...');
+            console.log('🔐 AUTHENTICATION CLICKED - Starting debug...');
             
-            if (!msalInstance) {
-                console.error('❌ MSAL instance not available');
-                
-                // Check if we're in a proper web environment
-                if (window.location.protocol === 'file:') {
-                    alert(`❌ File Protocol Detected
+            // Step 1: Check if MSAL library loaded
+            if (typeof msal === 'undefined') {
+                console.error('❌ MSAL library not available');
+                alert(`❌ Microsoft Authentication Library Not Loaded
 
-You're running the app from a file:// URL, which won't work with Outlook authentication.
+The authentication library failed to load. This could be due to:
+• Network connectivity issues
+• Firewall/ad blocker interference
+• CDN unavailable
 
-✅ Solutions:
-1. Upload to GitHub Pages (recommended)
-2. Use a local web server:
-   • Python: python -m http.server 8000
-   • Node.js: npx serve .
-   • PHP: php -S localhost:8000
+Solutions:
+1. Check internet connection
+2. Disable ad blockers temporarily
+3. Try refreshing the page
+4. Try a different network
 
-Then access via http://localhost:8000`);
-                } else {
-                    alert(`❌ Authentication Setup Issue
-
-The Microsoft authentication library (MSAL) is not available.
-
-🔧 Possible fixes:
-1. Check your internet connection
-2. Try refreshing the page
-3. Check browser console for errors
-
-Current environment: ${window.location.href}`);
-                }
-                
-                simulateAuthentication();
+Technical: MSAL library from Microsoft CDN failed to load.`);
                 return;
             }
+            
+            console.log('✅ MSAL library is available');
+            
+            // Step 2: Check if MSAL instance was created
+            if (!msalInstance) {
+                console.error('❌ MSAL instance not created');
+                try {
+                    console.log('🔧 Attempting to create MSAL instance...');
+                    msalInstance = new msal.PublicClientApplication(msalConfig);
+                    console.log('✅ MSAL instance created successfully');
+                } catch (error) {
+                    console.error('❌ Failed to create MSAL instance:', error);
+                    alert(`❌ Authentication Configuration Error
 
+Failed to initialize Microsoft authentication.
+
+Error: ${error.message}
+
+This usually means:
+• Invalid Client ID: ${msalConfig.auth.clientId}
+• Wrong redirect URI: ${msalConfig.auth.redirectUri}
+• Azure AD app not configured properly
+
+Click "🔧 Setup Help" for configuration instructions.`);
+                    return;
+                }
+            }
+            
+            console.log('✅ MSAL instance available');
+            
+            // Step 3: Show loading state
+            const authButton = document.getElementById('authButton');
+            const originalText = authButton.textContent;
+            authButton.textContent = 'Connecting...';
+            authButton.disabled = true;
+            
             try {
                 console.log('🚀 Starting popup authentication...');
-                console.log('Login request scopes:', loginRequest.scopes);
+                console.log('Config:', {
+                    clientId: msalConfig.auth.clientId,
+                    redirectUri: msalConfig.auth.redirectUri,
+                    scopes: loginRequest.scopes
+                });
                 
-                showUserNotification('Opening Microsoft login popup...', 'info');
+                showUserNotification('Opening Microsoft login window...', 'info');
                 
+                // Step 4: Attempt authentication
                 const response = await msalInstance.loginPopup(loginRequest);
                 console.log('✅ Authentication successful:', response);
                 
@@ -1699,48 +1769,78 @@ Current environment: ${window.location.href}`);
             } catch (error) {
                 console.error('❌ Authentication failed:', error);
                 
-                // Provide specific error messages
-                let errorMessage = 'Authentication failed. ';
-                let actionMessage = '';
+                // Detailed error analysis
+                let errorTitle = 'Authentication Failed';
+                let errorMessage = '';
+                let solution = '';
                 
-                if (error.errorCode === 'popup_window_error') {
-                    errorMessage += 'Popup was blocked.';
-                    actionMessage = 'Please allow popups for this site and try again.';
-                } else if (error.errorCode === 'user_cancelled') {
-                    errorMessage += 'Login was cancelled.';
-                    actionMessage = 'Please try again and complete the login process.';
-                } else if (error.message?.includes('redirect_uri')) {
-                    errorMessage += 'Redirect URI mismatch.';
-                    actionMessage = `Please add "${config.redirectUri}" to your Azure AD app registration.`;
-                } else if (error.message?.includes('CORS')) {
-                    errorMessage += 'CORS error.';
-                    actionMessage = 'Please check your Azure AD CORS settings.';
+                if (error.errorCode === 'popup_window_error' || error.message?.includes('popup')) {
+                    errorTitle = 'Popup Blocked';
+                    errorMessage = 'The login popup was blocked by your browser.';
+                    solution = `Solutions:
+1. Allow popups for this site: ${window.location.origin}
+2. Look for popup blocker icon in address bar
+3. Try holding Ctrl while clicking "Connect to Outlook"
+4. Disable browser popup blocker temporarily`;
+                    
+                } else if (error.errorCode === 'user_cancelled' || error.message?.includes('user_cancelled')) {
+                    errorTitle = 'Login Cancelled';
+                    errorMessage = 'You cancelled the login process.';
+                    solution = 'Click "Connect to Outlook" again and complete the Microsoft login.';
+                    
+                } else if (error.message?.includes('redirect_uri') || error.errorCode?.includes('redirect_uri')) {
+                    errorTitle = 'Configuration Error';
+                    errorMessage = 'The redirect URI is not registered in Azure AD.';
+                    solution = `Solutions:
+1. Go to portal.azure.com
+2. Find your Azure AD app registration
+3. Add this exact URL to redirect URIs: ${msalConfig.auth.redirectUri}
+4. Make sure there are no typos or extra/missing slashes`;
+                    
+                } else if (error.message?.includes('CORS') || error.message?.includes('cors')) {
+                    errorTitle = 'CORS Error';
+                    errorMessage = 'Cross-origin request blocked.';
+                    solution = `Solutions:
+1. Add ${window.location.origin} to Azure AD CORS settings
+2. Make sure app is accessed via HTTPS (not HTTP)
+3. Check Azure AD app configuration`;
+                    
+                } else if (error.errorCode?.includes('invalid_client') || error.message?.includes('invalid_client')) {
+                    errorTitle = 'Invalid Client ID';
+                    errorMessage = 'The Azure AD application ID is invalid.';
+                    solution = `Solutions:
+1. Verify Client ID: ${msalConfig.auth.clientId}
+2. Check if Azure AD app exists and is active
+3. Make sure you copied the Application (client) ID correctly`;
+                    
                 } else {
-                    errorMessage += error.message || 'Unknown error occurred.';
+                    errorMessage = error.message || 'Unknown authentication error occurred.';
+                    solution = `Debug information:
+• Error Code: ${error.errorCode || 'None'}
+• Error Message: ${error.message || 'None'}
+• Check browser console for more details`;
                 }
                 
-                console.log('🔧 Troubleshooting info:');
-                console.log('- Client ID:', msalConfig.auth.clientId);
-                console.log('- Redirect URI:', msalConfig.auth.redirectUri);
-                console.log('- Current URL:', window.location.href);
-                console.log('- Error details:', error);
-                
-                alert(`${errorMessage}
+                // Show detailed error to user
+                alert(`${errorTitle}
 
-${actionMessage}
+${errorMessage}
 
-🔧 Debug info (check console for details):
+${solution}
+
+Technical Details:
 • Client ID: ${msalConfig.auth.clientId}
 • Redirect URI: ${msalConfig.auth.redirectUri}
 • Current URL: ${window.location.href}
-
-💡 Common fixes:
-1. Add your exact URL to Azure AD redirect URIs
-2. Enable popups for this site
-3. Clear browser cache and try again`);
+• Error Code: ${error.errorCode || 'None'}`);
                 
                 handleError(error, 'Authentication');
                 updateAuthStatus(false);
+                
+            } finally {
+                // Reset button state
+                authButton.textContent = originalText;
+                authButton.disabled = false;
             }
         }
 
@@ -1768,11 +1868,13 @@ ${actionMessage}
                 statusText.textContent = 'Connected to Outlook';
                 authButton.textContent = 'Disconnect';
                 authButton.onclick = disconnect;
+                authButton.style.background = '#dc2626'; // Red for disconnect
             } else {
                 statusIndicator.classList.remove('connected');
                 statusText.textContent = 'Not connected to Outlook';
                 authButton.textContent = 'Connect to Outlook';
-                authButton.onclick = authenticateOutlook;
+                authButton.onclick = testButtonClick; // Use the test function
+                authButton.style.background = '#0078d4'; // Blue for connect
             }
         }
 
@@ -2429,7 +2531,79 @@ ${actionMessage}
             });
         }
 
-        function checkAuthenticationStatus() {
+        // Test function to ensure button clicks are working
+        function testButtonClick() {
+            console.log('🔘 Button clicked! Authentication starting...');
+            showUserNotification('Button clicked - starting authentication...', 'info');
+            
+            // Add visual feedback
+            const button = document.getElementById('authButton');
+            button.style.background = '#005a9e';
+            button.textContent = 'Clicked! Connecting...';
+            
+            setTimeout(() => {
+                authenticateOutlook();
+            }, 100);
+        }
+
+        function runConnectionTest() {
+            console.log('🧪 Running connection test...');
+            
+            const tests = [];
+            
+            // Test 1: MSAL Library
+            if (typeof msal !== 'undefined') {
+                tests.push('✅ MSAL library loaded');
+            } else {
+                tests.push('❌ MSAL library NOT loaded');
+            }
+            
+            // Test 2: Current URL
+            tests.push(`📍 Current URL: ${window.location.href}`);
+            tests.push(`🔒 Protocol: ${window.location.protocol}`);
+            
+            // Test 3: Configuration
+            tests.push(`🆔 Client ID: ${msalConfig.auth.clientId}`);
+            tests.push(`🔄 Redirect URI: ${msalConfig.auth.redirectUri}`);
+            
+            // Test 4: MSAL Instance
+            if (msalInstance) {
+                tests.push('✅ MSAL instance created');
+            } else {
+                tests.push('❌ MSAL instance NOT created');
+            }
+            
+            // Test 5: Popup test
+            try {
+                const popup = window.open('', '_blank', 'width=1,height=1');
+                if (popup) {
+                    popup.close();
+                    tests.push('✅ Popups allowed');
+                } else {
+                    tests.push('❌ Popups blocked');
+                }
+            } catch (error) {
+                tests.push('❌ Popup test failed');
+            }
+            
+            const testResults = tests.join('\n');
+            console.log('🧪 Connection Test Results:\n' + testResults);
+            
+            alert(`🧪 Connection Test Results:
+
+${testResults}
+
+${tests.some(t => t.includes('❌')) ? 
+`⚠️ Issues Found:
+Check the items marked with ❌ above.
+Most common fixes:
+• Allow popups for this site
+• Check internet connection
+• Verify Azure AD configuration` : 
+'✅ All tests passed! Authentication should work.'}
+
+Check browser console for detailed logs.`);
+        }
             console.log('🔍 Checking authentication status...');
             
             // Check for immediate issues
