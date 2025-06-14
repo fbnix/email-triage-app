@@ -743,8 +743,7 @@
         // Environment-based configuration
         const CONFIG = {
             production: {
-                // 🚨 UPDATE THIS URL TO YOUR GITHUB PAGES URL! 🚨
-                redirectUri: 'https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/',
+                redirectUri: 'https://fbnix.github.io/email-triage-app/',
                 clientId: '189e8579-c8e6-45bd-b37a-91d050743c9d'
             },
             development: {
@@ -1222,41 +1221,7 @@ Next steps:
                 email.status = restoredStatus;
             });
 
-            if (tasks.length === 0) {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(17, 0, 0, 0);
-                
-                const nextWeek = new Date();
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                
-                tasks = [
-                    {
-                        id: 1,
-                        title: "Review patent application for XYZ Corp",
-                        description: "Complete review of patent application draft",
-                        bucket: "review-drafts",
-                        estimatedTime: 90,
-                        deadline: nextWeek,
-                        priority: "high",
-                        completed: false,
-                        createdAt: new Date()
-                    },
-                    {
-                        id: 2,
-                        title: "Draft response to motion to dismiss",
-                        description: "Prepare comprehensive response",
-                        bucket: "review-responses",
-                        estimatedTime: 120,
-                        deadline: tomorrow,
-                        priority: "high",
-                        completed: false,
-                        createdAt: new Date()
-                    }
-                ];
-                
-                saveTasksToStorage();
-            }
+            // Start with empty task list - no demo tasks
         }
 
         // Load Outlook data
